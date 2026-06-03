@@ -1,12 +1,12 @@
 # DEPLOY.md — click-by-click
 
-Get the Weekly Property Update bot running on an always-on cloud host. Plan for
-~30 minutes the first time. Order:
+Get the Weekly Property Update bot running on an always-on host. Plan for
+~20–30 minutes the first time. Order:
 
 1. [Create the Telegram bot token](#1-telegram-bot-token)
 2. [Create the Anthropic API key](#2-anthropic-api-key)
 3. [Authorize Gmail (one-time Google sign-in)](#3-authorize-gmail-one-time) — skip if using Telegram delivery
-4. [Deploy on Railway](#4a-deploy-on-railway-recommended) **or** [Render](#4b-deploy-on-render)
+4. Run it always-on — [on a Mac you keep on](#4c-run-always-on-on-your-mac-free) (free, recommended), or [Railway](#4a-deploy-on-railway-recommended) / [Render](#4b-deploy-on-render)
 5. [First run & test](#5-first-run--test)
 
 > **Don't want any Google setup?** Set `DELIVERY_METHOD=telegram`, skip step 3,
@@ -134,6 +134,77 @@ in step 4. **Keep it secret** (it's git-ignored).
 
 > Render's free tier sleeps inactive services; for an always-on bot + Friday
 > scheduler use a paid instance (or Railway).
+
+---
+
+## 4c. Run always-on on your Mac (free)
+
+If you have a Mac (or any computer) that stays on, this is the simplest
+zero-cost option — the bot runs exactly as written (Telegram long-polling,
+local SQLite, in-process scheduler), with no public URL or external database.
+Set it up once as a `launchd` agent and it auto-starts at login and restarts
+itself if it ever crashes.
+
+**Prerequisite:** Python 3.11+ (`python3 --version`; if older,
+`brew install python@3.11`).
+
+1. **Get the code** onto the Mac:
+   ```bash
+   git clone https://github.com/trevormartin11/General.git
+   cd General && git checkout claude/confident-bohr-WgOHt
+   cd weekly-property-update
+   ```
+   (Once this is merged to `main`, skip the `git checkout` line.)
+
+2. **Install dependencies** in a virtualenv:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   ```
+
+3. **Configure** — copy the template and fill it in:
+   ```bash
+   cp .env.example .env
+   open -e .env      # set TELEGRAM_BOT_TOKEN (and ANTHROPIC_API_KEY for /report)
+   ```
+   To just start capturing notes you only need `TELEGRAM_BOT_TOKEN`. Add
+   `ANTHROPIC_API_KEY` before using `/report`, and the Gmail step (section 3)
+   before using Gmail delivery. The default `DB_PATH=data/entries.db` is fine —
+   it's a normal persistent file on your Mac.
+
+4. **Test it** in the foreground first:
+   ```bash
+   python -m app.main
+   ```
+   In Telegram, send the bot `/start`, copy the chat id it replies with into
+   `MANAGER_CHAT_ID` in `.env`, then stop it with `Ctrl-C`.
+
+5. **Install the always-on service** (a `launchd` LaunchAgent):
+   ```bash
+   mkdir -p ~/Library/LaunchAgents
+   cp deploy/com.weeklypropertyupdate.bot.plist ~/Library/LaunchAgents/
+   # Open the copy and replace every /ABSOLUTE/PATH/TO with your real path:
+   open -e ~/Library/LaunchAgents/com.weeklypropertyupdate.bot.plist
+   launchctl load ~/Library/LaunchAgents/com.weeklypropertyupdate.bot.plist
+   ```
+   It now starts at login and restarts on crash. Logs land in `data/bot.log`
+   and `data/bot.err.log`.
+   - **Restart after editing `.env`:**
+     ```bash
+     launchctl unload ~/Library/LaunchAgents/com.weeklypropertyupdate.bot.plist
+     launchctl load   ~/Library/LaunchAgents/com.weeklypropertyupdate.bot.plist
+     ```
+   - **Stop it:** `launchctl unload ~/Library/LaunchAgents/com.weeklypropertyupdate.bot.plist`
+
+6. **Keep the Mac awake.** Make sure it doesn't sleep: **System Settings →
+   Displays → Advanced → "Prevent automatic sleeping when the display is off"**
+   (or run under `caffeinate`). If it already hosts your always-on Hermes setup,
+   you're already covered.
+
+> A LaunchAgent runs while you're logged in — ideal for an always-on machine you
+> stay signed into. For login-independent operation, use a system-wide
+> LaunchDaemon instead.
 
 ---
 
