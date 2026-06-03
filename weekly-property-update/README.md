@@ -67,14 +67,43 @@ weekly-property-update/
 │   ├── pipeline.py      # gather → compile → deliver orchestration
 │   ├── scheduler.py     # weekly cron job, in your timezone
 │   └── util.py          # week windows, date formatting, markdown→html
-├── scripts/gmail_auth.py  # one-time local Google sign-in → token.json
+│
+├── api/                 # ── serverless deployment (Vercel) ──
+│   ├── telegram.py      # Telegram webhook (capture + commands)
+│   └── report.py        # weekly compile endpoint (called by a GitHub Action)
+├── wpu/                 # shared serverless core (Supabase storage + the
+│   │                    #   Claude compile + Gmail draft logic)
+│   ├── config.py  db.py  telegram_api.py  compile.py  gmail.py  deliver.py  timeutil.py
+├── vercel.json          # function config (60s limit, bundle wpu/)
+├── supabase_schema.sql  # the entries table
+├── .github/workflows/weekly-report.yml   # (repo root) Friday scheduler → /api/report
+│
+├── scripts/
+│   ├── gmail_auth.py    # one-time local Google sign-in → token.json
+│   └── set_webhook.py   # point Telegram at the Vercel webhook
 ├── samples/             # sample notes + the report they produce
 ├── requirements.txt
-├── Procfile             # worker: python -m app.main
-├── .env.example
-├── README.md
-└── DEPLOY.md            # click-by-click hosting on Railway or Render
+├── .env.example         # for the local/Mac runner
+├── .env.vercel.example  # for the Vercel deployment
+├── DEPLOY.md            # local/Mac (launchd) + Railway/Render
+└── DEPLOY-vercel.md     # Vercel + Supabase + GitHub (recommended)
 ```
+
+---
+
+## Two ways to deploy
+
+| | **Vercel + Supabase + GitHub** (recommended) | **Long-running process** (`app/`) |
+|---|---|---|
+| Shape | Serverless webhook + Supabase DB + scheduled GitHub Action | One always-on process: polling + SQLite + APScheduler |
+| Cost | $0 on free tiers | $0 on a Mac/VM you keep on; ~$5/mo on Railway/Render |
+| Maintenance | None (nothing to keep running) | Keep the process/host alive |
+| Guide | [DEPLOY-vercel.md](DEPLOY-vercel.md) | [DEPLOY.md](DEPLOY.md) |
+
+Both share the same capture → compile → deliver design and the same report
+output; they differ only in capture transport, storage, and scheduler. Pick one
+— don't run both against the same bot (Telegram allows polling *or* a webhook,
+not both).
 
 ---
 
@@ -153,4 +182,5 @@ can't send you nudges.
 - **v2:** at compile time, scan Gmail/Calendar for property items you forgot to
   log and suggest them for inclusion.
 
-See [DEPLOY.md](DEPLOY.md) to host it on an always-on cloud box.
+To host it: **[DEPLOY-vercel.md](DEPLOY-vercel.md)** (serverless, free,
+recommended) or **[DEPLOY.md](DEPLOY.md)** (long-running on a Mac/VM/Railway).
