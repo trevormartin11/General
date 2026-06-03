@@ -1,0 +1,13 @@
+These are example free-text notes as they might be sent to the Telegram bot
+during the week — one message at a time, no structure required. They produce
+samples/sample_report.md when compiled.
+
+[Mon Jun 2, 8:10 AM]  replaced two smoke detectors at the Lakehouse, $60 from Home Depot
+[Mon Jun 2, 2:30 PM]  Lakehouse dock inspection - one piling looks loose, getting a quote from Marine Works next week
+[Tue Jun 3, 9:00 AM]  fixed burst pipe under the kitchen sink at the Downtown Duplex unit B, $480 to Trident Plumbing
+[Tue Jun 3, 4:15 PM]  paid monthly landscaping for all properties, $350 to GreenScape
+[Wed Jun 4, 11:00 AM] Mountain Cabin - a snow guard fell off the roof, swept the driveway, no cost
+[Wed Jun 4, 3:00 PM]  tenant at Downtown Duplex unit A reported a slow drain, scheduled Trident for next Tue
+[Thu Jun 5, 10:20 AM] Lakehouse annual HVAC service done, $220 to Valley Air, all good
+[Thu Jun 5, 1:00 PM]  bought new patio furniture for the Mountain Cabin, $1,150 from Costco
+[Fri Jun 6, 9:30 AM]  Mountain Cabin gutters need replacing, awaiting a quote - owners may need to decide on budget
