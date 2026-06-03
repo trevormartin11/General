@@ -44,6 +44,9 @@ def main() -> None:
         log.error("Fix these in your .env / host environment and restart.")
         sys.exit(1)
 
+    for warning in CONFIG.warnings():
+        log.warning(warning)
+
     db.init_db()
 
     app = (

@@ -95,22 +95,42 @@ class Config:
         )
 
     def validate(self) -> list[str]:
-        """Return a list of human-readable problems; empty means good to go."""
+        """Fatal problems that prevent the bot from starting at all.
+
+        Only what *capture* needs. Report-time requirements (Anthropic key,
+        Gmail auth, recipients) are surfaced as warnings instead, and enforced
+        with a clear message when a report is actually generated — so you can
+        start logging notes before finishing the rest of the setup.
+        """
         problems: list[str] = []
         if not self.telegram_bot_token:
             problems.append("TELEGRAM_BOT_TOKEN is missing (create one via @BotFather).")
-        if not self.anthropic_api_key:
-            problems.append("ANTHROPIC_API_KEY is missing (create one at console.anthropic.com).")
         if self.delivery_method not in ("gmail", "telegram"):
             problems.append("DELIVERY_METHOD must be 'gmail' or 'telegram'.")
-        if self.delivery_method == "gmail" and not self.owner_emails:
-            problems.append("OWNER_EMAILS is empty but DELIVERY_METHOD=gmail needs recipients.")
-        if self.delivery_method == "gmail" and not (self.gmail_token_json or os.path.exists(self.gmail_token_file)):
-            problems.append(
-                "Gmail is not authorized: set GMAIL_TOKEN_JSON, or run scripts/gmail_auth.py "
-                "to create token.json."
-            )
         return problems
+
+    def warnings(self) -> list[str]:
+        """Non-fatal: capture works, but these block /report until fixed."""
+        warns: list[str] = []
+        if not self.anthropic_api_key:
+            warns.append(
+                "ANTHROPIC_API_KEY is not set — capture works, but /report and the "
+                "weekly compile will fail until you add it."
+            )
+        if self.delivery_method == "gmail":
+            if not self.owner_emails:
+                warns.append("OWNER_EMAILS is empty — the Gmail draft would have no recipients.")
+            if not (self.gmail_token_json or os.path.exists(self.gmail_token_file)):
+                warns.append(
+                    "Gmail is not authorized yet — run scripts/gmail_auth.py (or set "
+                    "GMAIL_TOKEN_JSON) before using /report. Capture still works."
+                )
+        if self.manager_chat_id is None:
+            warns.append(
+                "MANAGER_CHAT_ID is not set — the bot will respond to anyone until you "
+                "set it. Send the bot /start to get your chat id."
+            )
+        return warns
 
     @property
     def owners_label(self) -> str:
