@@ -4,6 +4,7 @@ in one always-on process. Run with:  python -m app.main
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import sys
 
@@ -57,6 +58,15 @@ def main() -> None:
         .build()
     )
     register_handlers(app)
+
+    # Python 3.14 no longer auto-creates an event loop for the main thread, but
+    # python-telegram-bot v21's run_polling() calls asyncio.get_event_loop().
+    # Ensure one exists so the bot runs on 3.12–3.14 as well as 3.11.
+    try:
+        asyncio.get_event_loop()
+    except RuntimeError:
+        asyncio.set_event_loop(asyncio.new_event_loop())
+
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
