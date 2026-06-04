@@ -40,15 +40,22 @@ Architecture:
 
 ## 1. Supabase (database)
 
-1. Go to **[supabase.com](https://supabase.com) → New project**. Name it (e.g.
-   `rowley-property-update`), pick a region, set a DB password, create it.
-2. Open **SQL Editor → New query**, paste the contents of
-   [`supabase_schema.sql`](supabase_schema.sql), and **Run**. That creates the
-   `entries` table.
-3. **Settings → API**, copy two values:
+Sharing one project across apps (schema-per-app)? We won't create a project —
+we'll add a dedicated `property_update` schema to your existing one.
+
+1. Open your project (e.g. `trevor-apps`) → **SQL Editor → New query**, paste the
+   contents of [`supabase_schema.sql`](supabase_schema.sql), and **Run**. That
+   creates the `property_update` schema + `entries` table, isolated from your
+   other apps.
+2. **Settings → API → "Exposed schemas"** → add **`property_update`** → **Save**.
+   (Lets the REST API reach the new schema; `SUPABASE_SCHEMA` must match it.)
+3. **Settings → API**, copy two values for Step 2:
    - **Project URL** → `SUPABASE_URL`
    - **`service_role` secret key** → `SUPABASE_SERVICE_KEY`
      (server-side only — never put this in a browser/client.)
+
+> Brand-new dedicated project instead? Same steps — just create it first
+> (New project → name → region → DB password).
 
 ---
 
@@ -63,8 +70,8 @@ Architecture:
    [`.env.vercel.example`](.env.vercel.example) for the annotated list):
    `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `MANAGER_CHAT_ID` (leave
    blank for now), `REPORT_SECRET`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`,
-   `ANTHROPIC_THINKING`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `MANAGER_NAME`,
-   `OWNERS_GREETING`, `OWNER_EMAILS`, `PROPERTIES`, `TIMEZONE`,
+   `ANTHROPIC_THINKING`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SUPABASE_SCHEMA`,
+   `MANAGER_NAME`, `OWNERS_GREETING`, `OWNER_EMAILS`, `PROPERTIES`, `TIMEZONE`,
    `DELIVERY_METHOD`, `GMAIL_SENDER`, `GMAIL_TOKEN_JSON`.
 5. **Deploy.** When it finishes, note your domain, e.g.
    `https://rowley-property-update.vercel.app`. Your endpoints are
