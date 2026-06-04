@@ -26,7 +26,7 @@ HELP_TEXT = (
     "I store it verbatim with a timestamp — no format needed.\n\n"
     "Commands:\n"
     "/report — compile this week's notes into a report now\n"
-    "/list — show this week's logged notes\n"
+    "/list — show this week's notes (tap 🗑 to delete any)\n"
     "/undo — remove the last note\n"
     "/help — show this message"
 )
@@ -46,7 +46,46 @@ def _handle_report(chat_id: int) -> None:
     telegram_api.send_message(chat_id, summary)
 
 
+def handle_callback(callback: dict) -> None:
+    """Handle an inline-button tap (the 🗑 Delete buttons from /list)."""
+    cb_id = callback.get("id")
+    message = callback.get("message") or {}
+    chat_id = message.get("chat", {}).get("id")
+    message_id = message.get("message_id")
+    data = callback.get("data", "")
+
+    if config.MANAGER_CHAT_ID is not None and chat_id != config.MANAGER_CHAT_ID:
+        if cb_id:
+            telegram_api.answer_callback_query(cb_id, "Not authorized")
+        return
+
+    if data.startswith("del:"):
+        try:
+            db.delete_entry(data.split(":", 1)[1])
+        except Exception:  # noqa: BLE001
+            traceback.print_exc()
+            if cb_id:
+                telegram_api.answer_callback_query(cb_id, "Couldn't delete — try again")
+            return
+        if cb_id:
+            telegram_api.answer_callback_query(cb_id, "Removed ✅")
+        if chat_id is not None and message_id is not None:
+            telegram_api.edit_message_text(
+                chat_id,
+                message_id,
+                f"🗑 Removed — {message.get('text', '')}",
+                reply_markup={"inline_keyboard": []},
+            )
+    elif cb_id:
+        telegram_api.answer_callback_query(cb_id)
+
+
 def handle_update(update: dict) -> None:
+    callback = update.get("callback_query")
+    if callback:
+        handle_callback(callback)
+        return
+
     msg = update.get("message") or update.get("edited_message")
     if not msg:
         return
@@ -79,10 +118,17 @@ def handle_update(update: dict) -> None:
         if not entries:
             telegram_api.send_message(chat_id, "No notes logged yet this week.")
         else:
-            lines = ["This week's notes:\n"]
-            for i, e in enumerate(entries, start=1):
-                lines.append(f"{i}. [{fmt_local(parse_utc(e['ts_utc']))}] {e['raw_text']}")
-            telegram_api.send_message(chat_id, "\n".join(lines))
+            telegram_api.send_message(
+                chat_id, f"🗒️ This week's notes ({len(entries)}) — tap 🗑 to remove one:"
+            )
+            for e in entries:
+                body = f"[{fmt_local(parse_utc(e['ts_utc']))}] {e['raw_text']}"
+                keyboard = {
+                    "inline_keyboard": [
+                        [{"text": "🗑 Delete", "callback_data": f"del:{e['id']}"}]
+                    ]
+                }
+                telegram_api.send_message(chat_id, body[:3500], reply_markup=keyboard)
     elif text.startswith("/undo"):
         removed = db.undo_last()
         if removed is None:

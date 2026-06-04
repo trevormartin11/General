@@ -85,3 +85,11 @@ def undo_last() -> dict | None:
     )
     d.raise_for_status()
     return last
+
+
+def delete_entry(entry_id) -> None:
+    """Delete one entry by id (int-validated to avoid injection)."""
+    d = httpx.delete(
+        f"{_BASE}?id=eq.{int(entry_id)}", headers=_write_headers(), timeout=_TIMEOUT
+    )
+    d.raise_for_status()
