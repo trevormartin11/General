@@ -1,0 +1,26 @@
+name: Weekly Property Report
+
+# Triggers the Vercel /api/report endpoint on a schedule. GitHub Actions cron is
+# UTC; Friday 16:00 America/Phoenix == 23:00 UTC (Phoenix has no DST, so this is
+# stable year-round). You can also run it by hand from the Actions tab.
+on:
+  schedule:
+    - cron: "0 23 * * 5"
+  workflow_dispatch: {}
+
+jobs:
+  trigger-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the report endpoint
+        env:
+          REPORT_URL: ${{ secrets.REPORT_URL }}
+          REPORT_SECRET: ${{ secrets.REPORT_SECRET }}
+        run: |
+          if [ -z "$REPORT_URL" ] || [ -z "$REPORT_SECRET" ]; then
+            echo "Missing REPORT_URL or REPORT_SECRET repo secret." >&2
+            exit 1
+          fi
+          curl -fsS --max-time 120 -X POST "$REPORT_URL" \
+            -H "X-Report-Secret: $REPORT_SECRET"
+          echo "Report endpoint triggered."

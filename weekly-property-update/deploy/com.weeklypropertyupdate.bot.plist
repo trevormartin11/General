@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd LaunchAgent for the Weekly Property Update bot (macOS, always-on).
+
+  1. Replace every /ABSOLUTE/PATH/TO/weekly-property-update below with the real
+     path where you cloned the repo (run `pwd` inside the folder to get it).
+  2. Copy this file to ~/Library/LaunchAgents/
+  3. launchctl load ~/Library/LaunchAgents/com.weeklypropertyupdate.bot.plist
+
+  RunAtLoad starts it now and at every login; KeepAlive restarts it if it exits.
+  See DEPLOY.md § "4c. Run always-on on your Mac" for the full walkthrough.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.weeklypropertyupdate.bot</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/ABSOLUTE/PATH/TO/weekly-property-update/.venv/bin/python</string>
+        <string>-m</string>
+        <string>app.main</string>
+    </array>
+
+    <!-- The app reads .env from this directory. -->
+    <key>WorkingDirectory</key>
+    <string>/ABSOLUTE/PATH/TO/weekly-property-update</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- Don't hammer restarts if it crashes on startup (e.g. bad config). -->
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+
+    <key>StandardOutPath</key>
+    <string>/ABSOLUTE/PATH/TO/weekly-property-update/data/bot.log</string>
+    <key>StandardErrorPath</key>
+    <string>/ABSOLUTE/PATH/TO/weekly-property-update/data/bot.err.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+</dict>
+</plist>

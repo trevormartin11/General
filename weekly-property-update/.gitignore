@@ -1,0 +1,24 @@
+# Secrets & credentials — NEVER commit these
+.env
+token.json
+client_secret*.json
+*.pem
+
+# SQLite data
+data/
+*.db
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
