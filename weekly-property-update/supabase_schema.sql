@@ -17,8 +17,9 @@ create table if not exists property_update.entries (
     id        bigint generated always as identity primary key,
     ts_epoch  bigint not null,   -- UTC seconds (used for the weekly window)
     ts_utc    text   not null,   -- ISO-8601 UTC timestamp (human/debug)
-    raw_text  text   not null,   -- the verbatim note
-    chat_id   bigint             -- Telegram chat the note came from
+    raw_text  text   not null,   -- the verbatim note (or photo caption)
+    chat_id   bigint,            -- Telegram chat the note came from
+    photo_path text              -- Supabase Storage path, if this entry is a photo
 );
 
 create index if not exists entries_ts_epoch_idx

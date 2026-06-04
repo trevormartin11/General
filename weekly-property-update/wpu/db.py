@@ -39,7 +39,7 @@ def _write_headers(prefer: str | None = None) -> dict:
     return headers
 
 
-def add_entry(raw_text: str, chat_id: int | None = None) -> dict:
+def add_entry(raw_text: str, chat_id: int | None = None, photo_path: str | None = None) -> dict:
     now = datetime.now(timezone.utc)
     row = {
         "ts_epoch": int(now.timestamp()),
@@ -47,6 +47,8 @@ def add_entry(raw_text: str, chat_id: int | None = None) -> dict:
         "raw_text": raw_text,
         "chat_id": chat_id,
     }
+    if photo_path:
+        row["photo_path"] = photo_path
     r = httpx.post(
         _BASE,
         headers=_write_headers("return=representation"),
@@ -88,8 +90,20 @@ def undo_last() -> dict | None:
 
 
 def delete_entry(entry_id) -> None:
-    """Delete one entry by id (int-validated to avoid injection)."""
-    d = httpx.delete(
-        f"{_BASE}?id=eq.{int(entry_id)}", headers=_write_headers(), timeout=_TIMEOUT
+    """Delete one entry by id; also remove its photo from storage if present."""
+    eid = int(entry_id)  # int-validated to avoid injection
+    photo_path = None
+    g = httpx.get(
+        f"{_BASE}?id=eq.{eid}&select=photo_path", headers=_read_headers(), timeout=_TIMEOUT
     )
+    if g.status_code == 200 and g.json():
+        photo_path = g.json()[0].get("photo_path")
+    d = httpx.delete(f"{_BASE}?id=eq.{eid}", headers=_write_headers(), timeout=_TIMEOUT)
     d.raise_for_status()
+    if photo_path:
+        from . import storage
+
+        try:
+            storage.delete(photo_path)
+        except Exception:  # noqa: BLE001
+            pass

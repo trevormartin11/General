@@ -45,6 +45,8 @@ SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
 # Postgres schema that holds this app's table (kept separate from your other
 # apps in a shared project). Must be added to the project's "Exposed schemas".
 SUPABASE_SCHEMA = os.environ.get("SUPABASE_SCHEMA", "public").strip()
+# Storage bucket for photos sent to the bot (attached to the weekly draft).
+SUPABASE_BUCKET = os.environ.get("SUPABASE_BUCKET", "property-photos").strip()
 
 # --- Who the report is from / to ---
 MANAGER_CHAT_ID = _int_or_none(os.environ.get("MANAGER_CHAT_ID"))

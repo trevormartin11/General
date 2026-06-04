@@ -9,6 +9,7 @@ APPENDed to the Drafts mailbox, exactly like one you'd compose yourself.
 from __future__ import annotations
 
 import imaplib
+import mimetypes
 import time
 from dataclasses import dataclass
 from email.message import EmailMessage
@@ -24,13 +25,23 @@ class DraftResult:
     link: str
 
 
-def _build_message(to_addresses: list[str], subject: str, text_body: str, html_body: str) -> EmailMessage:
+def _build_message(
+    to_addresses: list[str],
+    subject: str,
+    text_body: str,
+    html_body: str,
+    attachments: list[tuple[str, bytes]] | None = None,
+) -> EmailMessage:
     msg = EmailMessage()
     msg["From"] = config.GMAIL_ADDRESS
     msg["To"] = ", ".join(to_addresses)
     msg["Subject"] = subject
     msg.set_content(text_body)
     msg.add_alternative(html_body, subtype="html")
+    for filename, data in attachments or []:
+        ctype, _ = mimetypes.guess_type(filename)
+        maintype, subtype = ctype.split("/", 1) if ctype else ("application", "octet-stream")
+        msg.add_attachment(data, maintype=maintype, subtype=subtype, filename=filename)
     return msg
 
 
@@ -51,13 +62,19 @@ def _drafts_mailbox(imap: imaplib.IMAP4_SSL) -> str:
     return "[Gmail]/Drafts"
 
 
-def create_draft(to_addresses: list[str], subject: str, text_body: str, html_body: str) -> DraftResult:
+def create_draft(
+    to_addresses: list[str],
+    subject: str,
+    text_body: str,
+    html_body: str,
+    attachments: list[tuple[str, bytes]] | None = None,
+) -> DraftResult:
     if not config.GMAIL_ADDRESS or not config.GMAIL_APP_PASSWORD:
         raise RuntimeError(
             "GMAIL_ADDRESS / GMAIL_APP_PASSWORD are not set. Turn on 2-Step "
             "Verification, generate a Google App Password, and set both env vars."
         )
-    msg = _build_message(to_addresses, subject, text_body, html_body)
+    msg = _build_message(to_addresses, subject, text_body, html_body, attachments)
     imap = imaplib.IMAP4_SSL("imap.gmail.com", 993)
     try:
         imap.login(config.GMAIL_ADDRESS, config.GMAIL_APP_PASSWORD)
