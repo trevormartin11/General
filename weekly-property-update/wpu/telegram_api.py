@@ -50,3 +50,16 @@ def edit_message_text(
     if reply_markup is not None:
         payload["reply_markup"] = reply_markup  # pass {"inline_keyboard": []} to clear
     httpx.post(f"{_API}/editMessageText", json=payload, timeout=15.0)
+
+
+def get_file_bytes(file_id: str) -> bytes:
+    """Download a Telegram file (e.g. a photo) by its file_id."""
+    info = httpx.get(f"{_API}/getFile", params={"file_id": file_id}, timeout=15.0)
+    info.raise_for_status()
+    file_path = info.json()["result"]["file_path"]
+    dl = httpx.get(
+        f"https://api.telegram.org/file/bot{config.TELEGRAM_BOT_TOKEN}/{file_path}",
+        timeout=30.0,
+    )
+    dl.raise_for_status()
+    return dl.content

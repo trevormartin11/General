@@ -29,7 +29,7 @@ def run_report() -> dict:
         return {"status": "empty"}
 
     report = compile_mod.compile_report(entries)
-    deliver.deliver_report(report)
+    deliver.deliver_report(report, entries)
     if config.MANAGER_CHAT_ID is not None:
         telegram_api.send_message(
             config.MANAGER_CHAT_ID,

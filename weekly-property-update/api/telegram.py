@@ -11,6 +11,7 @@ import json
 import os
 import sys
 import traceback
+import uuid
 from http.server import BaseHTTPRequestHandler
 
 # Make the shared wpu/ package importable (it sits at the project root).
@@ -42,8 +43,32 @@ def _handle_report(chat_id: int) -> None:
         telegram_api.send_message(chat_id, "🗒️ No notes logged this week yet.")
         return
     report = compile_mod.compile_report(entries)
-    summary = deliver.deliver_report(report)
+    summary = deliver.deliver_report(report, entries)
     telegram_api.send_message(chat_id, summary)
+
+
+def _handle_photo(chat_id: int, msg: dict, photos: list) -> None:
+    """Save a photo to Supabase Storage and log it as an entry."""
+    from wpu import storage
+
+    caption = (msg.get("caption") or "").strip()
+    file_id = photos[-1]["file_id"]  # last = largest size
+    try:
+        data = telegram_api.get_file_bytes(file_id)
+        path = f"{uuid.uuid4().hex}.jpg"
+        storage.upload(path, data, "image/jpeg")
+    except Exception:  # noqa: BLE001
+        traceback.print_exc()
+        telegram_api.send_message(chat_id, "⚠️ Couldn't save that photo — try again.")
+        return
+    entry = db.add_entry(caption or "📷 Photo", chat_id, photo_path=path)
+    week = db.get_week_entries()
+    telegram_api.send_message(
+        chat_id,
+        f"📷 Photo saved (#{entry['id']})"
+        + (f": {caption}" if caption else "")
+        + f". {len(week)} note(s) this week — it'll be attached to the report.",
+    )
 
 
 def handle_callback(callback: dict) -> None:
@@ -98,6 +123,11 @@ def handle_update(update: dict) -> None:
         telegram_api.send_message(chat_id, "Sorry, this bot is private.")
         return
 
+    photos = msg.get("photo")
+    if photos:
+        _handle_photo(chat_id, msg, photos)
+        return
+
     text = (msg.get("text") or "").strip()
     if not text:
         return
@@ -123,6 +153,8 @@ def handle_update(update: dict) -> None:
             )
             for e in entries:
                 body = f"[{fmt_local(parse_utc(e['ts_utc']))}] {e['raw_text']}"
+                if e.get("photo_path"):
+                    body = "📷 " + body
                 keyboard = {
                     "inline_keyboard": [
                         [{"text": "🗑 Delete", "callback_data": f"del:{e['id']}"}]
