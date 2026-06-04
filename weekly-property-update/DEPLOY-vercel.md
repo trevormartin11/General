@@ -27,9 +27,11 @@ Architecture:
 
 - **Telegram bot token** (@BotFather) — you have this.
 - **Anthropic API key** (console.anthropic.com).
-- **Gmail `token.json`** — run `python scripts/gmail_auth.py client_secret.json`
-  locally (see the Gmail steps in [DEPLOY.md](DEPLOY.md) §3). You'll paste its
-  contents into `GMAIL_TOKEN_JSON`.
+- **Gmail App Password** (for the draft delivery) — turn on 2-Step Verification
+  on the account, then create one at **myaccount.google.com/apppasswords**. No
+  Google Cloud project or OAuth needed; the bot drops drafts in via IMAP. You'll
+  set `GMAIL_ADDRESS` + `GMAIL_APP_PASSWORD`. (Or skip Gmail and use
+  `DELIVERY_METHOD=telegram`.)
 - **Two random secrets** — make them with:
   ```bash
   python -c "import secrets; print(secrets.token_urlsafe(32))"   # run twice
@@ -72,7 +74,7 @@ we'll add a dedicated `property_update` schema to your existing one.
    blank for now), `REPORT_SECRET`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`,
    `ANTHROPIC_THINKING`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SUPABASE_SCHEMA`,
    `MANAGER_NAME`, `OWNERS_GREETING`, `OWNER_EMAILS`, `PROPERTIES`, `TIMEZONE`,
-   `DELIVERY_METHOD`, `GMAIL_SENDER`, `GMAIL_TOKEN_JSON`.
+   `DELIVERY_METHOD`, `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`.
 5. **Deploy.** When it finishes, note your domain, e.g.
    `https://rowley-property-update.vercel.app`. Your endpoints are
    `…/api/telegram` and `…/api/report`.

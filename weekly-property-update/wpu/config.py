@@ -58,6 +58,10 @@ TIMEZONE = os.environ.get("TIMEZONE", "America/Phoenix").strip()
 DELIVERY_METHOD = os.environ.get("DELIVERY_METHOD", "gmail").strip().lower()
 GMAIL_TOKEN_JSON = os.environ.get("GMAIL_TOKEN_JSON") or ""
 GMAIL_SENDER = os.environ.get("GMAIL_SENDER", "me").strip()
+# Gmail draft via IMAP App Password (no OAuth / no Google Cloud / no verification).
+GMAIL_ADDRESS = os.environ.get("GMAIL_ADDRESS", "").strip()
+# App passwords are shown as 4 groups of 4 with spaces — strip them.
+GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "").replace(" ", "").strip()
 
 
 def owners_label() -> str:
