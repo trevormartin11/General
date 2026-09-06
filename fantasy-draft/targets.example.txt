@@ -1,0 +1,5 @@
+# One player per line. These get a small bump (~8%) - a nudge, not an override.
+# Copy this file to targets.txt (each of you keeps your own copy on your own machine).
+# Lines starting with # are ignored.
+Puka Nacua
+Brock Bowers
