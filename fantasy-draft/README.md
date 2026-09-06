@@ -11,7 +11,8 @@ own ESPN login; each copy only sees its own roster and the shared board, so
 there is nothing to coordinate.
 
 > Draft-day checklist: see **[DRAFT_DAY.md](DRAFT_DAY.md)**.
-> Running it through Claude Code on your machine: it reads **[CLAUDE.md](CLAUDE.md)**.
+> Running it through Claude Code on your machine: it reads **[CLAUDE.md](CLAUDE.md)**;
+> **[SETUP_PROMPT.md](SETUP_PROMPT.md)** is the message to paste into a local session to get set up.
 
 ## What it does
 
