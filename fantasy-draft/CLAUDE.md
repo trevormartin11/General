@@ -19,12 +19,16 @@ draft with the co-pilot in this folder. Read README.md and DRAFT_DAY.md first.
 
 ## What to do when asked to "run my draft"
 
-1. `python3 draft.py status` - confirm league name, 12 teams, scoring line
-   `pass TD = 6.0, reception = 1.0`, and that `<== you` marks their team with
-   a draft slot. If detection fails, ask which team is theirs and pass
-   `--team-id` / `--slot`, or set it in `config.json`.
-2. Optionally `python3 draft.py board` and `python3 draft.py simulate` so they
-   can see the strategy.
+1. `python3 draft.py selftest` - checks Python, the offline tests, ESPN
+   access, the cookies in `config.json`, the league (must show
+   `pass TD = 6.0, reception = 1.0`, 12 teams), their team + slot, the
+   player pool, a simulated draft, and a fast offline mock. Fix whatever it
+   flags. If team detection fails, `python3 draft.py status` lists the
+   teams; set `team_id` (or `slot`) in `config.json`.
+2. `python3 draft.py mock` in its own terminal window (`start_mock.command`
+   / `start_mock.bat`) is the practice draft that looks exactly like draft
+   day; `--auto --pace 0.5` runs a quick automatic one. `board` and
+   `simulate` show the strategy.
 3. When the draft room opens, start the co-pilot **in its own terminal
    window**, not through your Bash tool (it runs for 2-3 hours and would hit
    the tool timeout):
@@ -50,3 +54,14 @@ draft with the co-pilot in this folder. Read README.md and DRAFT_DAY.md first.
   tested it in an ESPN mock draft with `--dry-run`. It is experimental.
 * Do not "improve" the value model minutes before the draft. If you must
   change code, run `python3 -m unittest discover -s tests` first.
+
+## Automation mode (the tool clicks the picks)
+
+Only when the person explicitly asks for it. Follow **AUTO_MODE.md**: install
+the `playwright` package, start a separate debug Chrome, rehearse in an ESPN
+mock draft with `probe_draft_room.py` and `auto_click_test.py` (dry run,
+then one real `--click` in the mock), adjust the selectors at the top of
+`auto_click.py` if ESPN's page differs, and only then run
+`python3 draft.py live --auto` for the real draft, in its own terminal
+window. You can inspect the live page through Playwright (see
+`probe_draft_room.py`) to fix selectors; never type into ESPN's login form.

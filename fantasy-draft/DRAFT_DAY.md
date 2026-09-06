@@ -22,6 +22,14 @@ Each person uses their **own** cookies on their **own** machine.
 ## 3. Verify
 
 ```
+python3 draft.py selftest
+```
+
+It checks Python, ESPN access, your cookies, the league, your team, the
+player pool, a simulated draft and a fast offline mock, and prints PASS/FAIL
+for each. For the team list and draft order:
+
+```
 python3 draft.py status
 ```
 
@@ -37,11 +45,17 @@ You want to see:
 If it says it can't tell which team is yours, add `"team_id": <id from the
 list>` to `config.json`, or pass `--slot N` on every command.
 
-## 4. Prep (optional, 5 minutes)
+## 4. Practice (5 minutes)
+
+Double-click `start_mock.command` (Mac) or `start_mock.bat` (Windows), or run
+`python3 draft.py mock`. It is an offline practice draft that looks exactly
+like draft day: other teams pick every 3 seconds, and when you're up the
+panel appears; press Enter to take the #1 recommendation or type a name.
+`python3 draft.py mock --auto --pace 0.5` runs a quick one automatically.
 
 ```
 python3 draft.py board            # cheat sheet under our scoring
-python3 draft.py simulate         # mock draft from your slot
+python3 draft.py simulate         # instant mock draft from your slot
 python3 draft.py simulate --slot 3 --slot 9    # both of you in one mock (use your real slots)
 ```
 

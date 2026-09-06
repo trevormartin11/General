@@ -216,6 +216,21 @@ class DraftStateFlow(unittest.TestCase):
         self.assertEqual(state.picks_until_mine(), 10)
         self.assertIn("You pick in 10 pick(s)", render_panel(state, set(), set()))
 
+    def test_negative_ids_count_as_picks(self):
+        """ESPN D/ST players have negative ids; they must be tracked like any other pick."""
+        cfg = family_cfg()
+        players = compute_values(synthetic_pool(), cfg)
+        dst = next(p for p in players if p.pos == "DST")
+        dst.id = -16034
+        state = DraftState(cfg, players, my_team_id=107, my_slot=7, picks_file=None)
+        state.by_id = {p.id: p for p in players}
+        lg = self._league()
+        lg["picks"].append({"overall": 1, "round": 1, "round_pick": 1, "team_id": 107, "player_id": -16034, "auto": 0})
+        state.update(lg)
+        self.assertEqual(state.picks_made, 1)
+        self.assertEqual([p.id for p in state.my_roster().players], [-16034])
+        self.assertNotIn(-16034, [p.id for p in state.available()])
+
     def test_manual_picks_file(self):
         import tempfile
         cfg = family_cfg()

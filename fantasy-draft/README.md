@@ -12,7 +12,8 @@ there is nothing to coordinate.
 
 > Draft-day checklist: see **[DRAFT_DAY.md](DRAFT_DAY.md)**.
 > Running it through Claude Code on your machine: it reads **[CLAUDE.md](CLAUDE.md)**;
-> **[SETUP_PROMPT.md](SETUP_PROMPT.md)** is the message to paste into a local session to get set up.
+> **[SETUP_PROMPT.md](SETUP_PROMPT.md)** is the message to paste into a local session to get set up;
+> **[START_HERE.md](START_HERE.md)** is the guide inside the zip built by `python3 build_package.py`.
 
 ## What it does
 
@@ -39,7 +40,7 @@ there is nothing to coordinate.
 | Mode | Command | Risk |
 |------|---------|------|
 | **Co-pilot (recommended)** | `python3 draft.py live` (or double-click `start_live.command` / `start_live.bat`) | none: it prints, you click in the ESPN draft room |
-| Auto-click (experimental) | `python3 draft.py live --auto` | brittle: drives your Chrome via Playwright; test in a mock draft first |
+| Auto-click (experimental) | `python3 draft.py live --auto` | brittle: drives your Chrome via Playwright; rehearse per [AUTO_MODE.md](AUTO_MODE.md) first |
 
 The co-pilot prints every pick as it happens, beeps when you are on the clock,
 and shows a ranked panel like this:
@@ -91,7 +92,9 @@ Paste them into `config.json`. They usually stay valid for a long time, but if
 ## Commands
 
 ```
+python3 draft.py selftest                     checks Python, tests, ESPN, cookies, team, mock
 python3 draft.py status                       league, teams, draft order, cookie check
+python3 draft.py mock [--auto --pace 0.5]     offline practice draft that looks like draft day
 python3 draft.py board [--csv board.csv]      cheat sheet under your scoring (+ CSV)
 python3 draft.py board --queue-file queue.txt names in draft order (for ESPN's queue / rankings)
 python3 draft.py live                         the co-pilot (Ctrl-C to stop)

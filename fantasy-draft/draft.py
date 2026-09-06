@@ -7,6 +7,8 @@ ESPN fantasy football draft co-pilot.
   python3 draft.py live                    watch the live draft; prints picks when you're up
   python3 draft.py recommend               one-shot recommendation for the current draft state
   python3 draft.py simulate --slot 7       mock a full draft with the engine in slot 7
+  python3 draft.py mock                    offline practice draft (Enter = take the #1 pick)
+  python3 draft.py selftest                check Python, tests, ESPN access, cookies, team, mock
   python3 draft.py mark "Player Name"      manual fallback: record a pick made in the room
   python3 draft.py mark --mine "Name"      ... a pick that YOU made
 
@@ -19,11 +21,15 @@ import argparse
 import csv
 import datetime as dt
 import difflib
+import io
 import json
 import os
+import random
 import re
 import sys
 import time
+import unittest
+from dataclasses import replace
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -165,7 +171,7 @@ class DraftState:
         self.api_picks = league.get("picks", [])
         drafted: dict[int, int | None] = {}
         for pk in self.api_picks:
-            if pk["player_id"] > 0:
+            if pk["player_id"] != 0:  # ESPN D/ST ids are negative; 0 = empty pick
                 drafted[pk["player_id"]] = pk["team_id"]
         for t in league.get("teams", []):
             for pid in t.get("roster_ids", []):
@@ -400,6 +406,57 @@ def cmd_recommend(args) -> int:
     return 0
 
 
+
+def auto_make_pick(state: DraftState, client: EspnClient, auto, targets: set[str], avoid: set[str], args) -> bool:
+    """
+    Automation mode: try to submit the best pick in the draft room and confirm
+    it via ESPN's API. Retries while the clock allows (ESPN shows the Draft
+    button a few seconds after the API says you're up), moves to the next
+    candidate if a submitted pick isn't confirmed. Returns True if confirmed.
+    """
+    pick_no = state.current_pick
+    deadline = time.time() + args.pick_deadline
+    tried: set[int] = set()
+    attempt = 0
+    while time.time() < deadline:
+        roster = state.my_roster()
+        last_pick = picks_for_slot(state.my_slot, state.cfg.teams, state.cfg.rounds)[-1]
+        recs = [r for r in recommend(state.available(), roster, state.cfg, pick_no, state.my_next_pick(), last_pick,
+                                     targets, avoid, top=6) if r.player.id not in tried]
+        if not recs:
+            break
+        attempt += 1
+        cand = recs[0]
+        print(f"[{ts()}] [auto] attempt {attempt}: {cand.player.name}")
+        submitted = auto.pick([cand])
+        if args.dry_run:
+            return submitted
+        if not submitted:
+            time.sleep(2)  # button not there yet? poll and retry the same candidate
+            try:
+                state.update(load_league(client))
+            except EspnError:
+                pass
+            if state.current_pick > pick_no:
+                print(f"[{ts()}] [auto] pick #{pick_no} is already made (ESPN autopick or you clicked).")
+                return True
+            continue
+        tried.add(cand.player.id)
+        confirm_by = time.time() + args.confirm_seconds
+        while time.time() < confirm_by:
+            time.sleep(2)
+            try:
+                state.update(load_league(client))
+            except EspnError:
+                continue
+            if state.current_pick > pick_no:
+                print(f"[{ts()}] [auto] ESPN confirmed the pick.")
+                return True
+        print(f"[{ts()}] [auto] not confirmed after {args.confirm_seconds}s; trying the next option")
+    print(f"[{ts()}] [auto] gave up on pick #{pick_no}; ESPN's queue/timer takes over.")
+    return False
+
+
 def cmd_live(args) -> int:
     client, state, targets, avoid, _ = _prepare_state(args)
     if not state.my_slot:
@@ -457,11 +514,7 @@ def cmd_live(args) -> int:
                         sys.stdout.write("\a\a")
                         sys.stdout.flush()
                     if auto:
-                        roster = state.my_roster()
-                        last_pick = picks_for_slot(state.my_slot, state.cfg.teams, state.cfg.rounds)[-1]
-                        recs = recommend(state.available(), roster, state.cfg, state.current_pick, state.my_next_pick(),
-                                         last_pick, targets, avoid, top=3)
-                        auto.pick(recs)
+                        auto_make_pick(state, client, auto, targets, avoid, args)
         if time.time() - last_pool_refresh > args.pool_refresh:
             try:
                 fresh = compute_values(load_pool(client, refresh=True), state.cfg)
@@ -539,6 +592,207 @@ def cmd_unmark(args) -> int:
     return 0
 
 
+
+# ------------------------------------------------------------ mock draft mode
+def run_mock(client: EspnClient, cfg_json: dict, args, slot: int | None = None, seed: int = 1, pace: float = 3.0,
+             auto: bool = False, fast: bool = False, quiet: bool = False, top: int = 8) -> tuple[Roster, dict]:
+    """
+    Offline practice draft that looks exactly like draft day: the other teams
+    follow ESPN ADP (with some randomness) at `pace` seconds per pick, and
+    when it's your turn the same panel appears. Press Enter to take the #1
+    recommendation, type a name to pick someone else, or use --auto.
+    """
+    league = load_league(client)
+    cfg = league_config(args, league, cfg_json)
+    players = compute_values(load_pool(client, refresh=getattr(args, "refresh", False)), cfg)
+    targets = load_names(getattr(args, "targets", None) or os.path.join(HERE, "targets.txt"))
+    avoid = load_names(getattr(args, "avoid", None) or os.path.join(HERE, "avoid.txt"))
+    rng = random.Random(seed)
+    slot = int(slot) if slot else rng.randint(1, cfg.teams)
+    team_ids = [1000 + i for i in range(1, cfg.teams + 1)]
+    teams = [{"id": tid, "name": ("YOU (mock)" if i == slot else f"Mock Team {i}"), "abbrev": "", "owners": [],
+              "roster_ids": []} for i, tid in enumerate(team_ids, 1)]
+    my_id = team_ids[slot - 1]
+    fake = {"name": "Practice draft (offline mock)", "size": cfg.teams, "lineup_slot_counts": league["lineup_slot_counts"],
+            "position_limits": league["position_limits"], "scoring": league.get("scoring", {}),
+            "draft": {"type": "SNAKE", "pick_order": team_ids, "seconds_per_pick": 60, "date_ms": None,
+                      "in_progress": True, "drafted": False},
+            "teams": teams, "members": {}, "picks": []}
+    state = DraftState(cfg, players, my_id, slot, None)
+    state.update(fake)
+    bot_cfg = replace(cfg, kdst_picks=5, max_pos={**cfg.max_pos, "QB": min(2, cfg.max_pos.get("QB", 2)),
+                                                    "TE": min(2, cfg.max_pos.get("TE", 2))})
+    rosters = {s: Roster(cfg) for s in range(1, cfg.teams + 1)}
+    reach = {s: rng.uniform(1.0, 3.5) for s in rosters}
+    out = (lambda *a, **k: None) if quiet else print
+    total = cfg.rounds * cfg.teams
+    my_last = picks_for_slot(slot, cfg.teams, cfg.rounds)[-1]
+    out(f"[{ts()}] PRACTICE DRAFT (offline) | {cfg.describe()} | {scoring_note(league)}")
+    out(f"[{ts()}] You are slot {slot} of {cfg.teams}. Other teams draft by ADP every {0 if fast else pace}s. "
+        f"{'Your picks are automatic.' if auto or fast else 'On your turn: Enter = take #1, or type a name.'}")
+    for overall in range(1, total + 1):
+        rnd, s = pick_to_round_slot(overall, cfg.teams)
+        available = state.available()
+        if s == slot:
+            out(render_panel(state, targets, avoid, top=top))
+            recs = recommend(available, state.my_roster(), cfg, overall,
+                             next_pick_after(overall, slot, cfg.teams, cfg.rounds), my_last, targets, avoid, top=1)
+            default = recs[0].player if recs else available[0]
+            pick = None
+            if auto or fast:
+                pick = default
+                if not fast:
+                    time.sleep(min(pace, 1.5))
+            else:
+                if not getattr(args, "no_beep", False):
+                    sys.stdout.write("\a")
+                while pick is None:
+                    try:
+                        text = input(f"Your pick (Enter = {default.name}; or type a name; q = quit): ").strip()
+                    except EOFError:
+                        text = ""
+                    if text.lower() == "q":
+                        raise KeyboardInterrupt
+                    if not text:
+                        pick = default
+                        break
+                    cand = find_player(available, text)
+                    if cand is None:
+                        print("  No available player matches that. Try again.")
+                        continue
+                    pick = cand
+        else:
+            picks_left = cfg.rounds - len(rosters[s])
+            pick = sim.bot_pick(available, rosters[s], bot_cfg, picks_left, rng, reach[s])
+            if not fast:
+                time.sleep(pace)
+        rosters[s].add(pick)
+        fake["picks"].append({"overall": overall, "round": rnd, "round_pick": (overall - 1) % cfg.teams + 1,
+                              "team_id": team_ids[s - 1], "player_id": pick.id, "auto": 0})
+        state.update(fake)
+        out(f"[{ts()}] {state.format_pick(fake['picks'][-1])}")
+    mine = state.my_roster()
+    if not quiet:
+        print(f"\n[{ts()}] Practice draft complete. Your roster:")
+        print_roster(mine)
+        table = sorted(rosters, key=lambda k: -rosters[k].starters_points())
+        print(f"  Projected starters rank: #{table.index(slot) + 1} of {cfg.teams}")
+    return mine, rosters
+
+
+def cmd_mock(args) -> int:
+    client, cfg_json = build_client(args)
+    slot = args.slot
+    if slot is None:
+        try:
+            league = load_league(client)
+            _team, slot = resolve_my_team(args, league, client, cfg_json)
+        except EspnError:
+            slot = None
+    try:
+        run_mock(client, cfg_json, args, slot=slot, seed=args.seed, pace=args.pace, auto=args.auto, fast=args.fast,
+                 top=args.top)
+    except KeyboardInterrupt:
+        print("\nPractice draft stopped.")
+    return 0
+
+
+# ------------------------------------------------------------------ selftest
+def cmd_selftest(args) -> int:
+    """Check Python, unit tests, ESPN access, cookies/league/team, player pool, simulation, and a fast mock draft."""
+    results: list[tuple[str, bool, str]] = []
+
+    def check(name: str, ok: bool, detail: str = "") -> None:
+        results.append((name, ok, detail))
+        print(f"  [{'PASS' if ok else 'FAIL'}] {name}{(': ' + detail) if detail else ''}")
+
+    print(f"Self-test started {dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} in {HERE}")
+    v = sys.version_info
+    check("Python 3.9+", (v.major, v.minor) >= (3, 9), f"{v.major}.{v.minor}.{v.micro}")
+
+    stream = io.StringIO()
+    suite = unittest.defaultTestLoader.discover(os.path.join(HERE, "tests"))
+    res = unittest.TextTestRunner(stream=stream, verbosity=0).run(suite)
+    check("Offline unit tests", res.wasSuccessful() and res.testsRun > 0,
+          f"{res.testsRun} tests, {len(res.failures)} failures, {len(res.errors)} errors")
+    if not res.wasSuccessful():
+        print(stream.getvalue()[-2000:])
+
+    cfg_json = load_config(args.config)
+    league_id = int(args.league_id or cfg_json.get("league_id") or DEFAULT_LEAGUE_ID)
+    season = int(args.season or cfg_json.get("season") or DEFAULT_SEASON)
+    public = EspnClient(league_id, season, cache_dir=CACHE_DIR, public=True)
+    try:
+        teams = public.pro_teams()
+        check("Internet access to ESPN", len(teams) >= 32, f"{len(teams)} NFL teams loaded")
+    except EspnError as e:
+        check("Internet access to ESPN", False, str(e)[:200])
+
+    real = EspnClient(league_id, season, espn_s2=cfg_json.get("espn_s2"), swid=cfg_json.get("swid"),
+                      cache_dir=CACHE_DIR, public=False)
+    client_for_pool = public
+    league = None
+    slot = None
+    if not real.has_cookies:
+        check("ESPN cookies in config.json", False,
+              "not set yet - copy config.example.json to config.json and paste espn_s2 + SWID (README 'Cookies')")
+    else:
+        try:
+            league = load_league(real)
+            sc = league.get("scoring") or {}
+            check("Private league reachable with your cookies", True,
+                  f"'{league['name']}', {league['size']} teams, pass TD = {sc.get(STAT_PASS_TD)}, reception = {sc.get(STAT_RECEPTION)}")
+            d = league["draft"]
+            check("Draft settings", d["type"] == "SNAKE",
+                  f"{d['type']}, {d['seconds_per_pick']}s per pick, order {'set' if d['pick_order'] else 'NOT SET YET'}")
+            team, slot = resolve_my_team(args, league, real, cfg_json)
+            check("Your team detected", team is not None,
+                  (f"{team['name']} (team id {team['id']}), slot {slot or 'unknown until the order is set'}" if team
+                   else "set team_id or slot in config.json (see 'python3 draft.py status')"))
+            client_for_pool = real
+        except AuthError as e:
+            check("Private league reachable with your cookies", False, str(e).splitlines()[0])
+        except EspnError as e:
+            check("Private league reachable with your cookies", False, str(e)[:200])
+    if league is None:
+        try:
+            league = load_league(public)
+        except EspnError as e:
+            print(f"Cannot continue without league settings: {e}")
+            return 1
+    cfg = LeagueConfig.from_espn(league, kdst_picks=int(cfg_json.get("kdst_picks", 3)))
+    try:
+        pool = load_pool(client_for_pool, refresh=args.refresh)
+        top = sorted(pool, key=lambda p: p.rank)[:3]
+        check("Player pool with projections", len(pool) >= 300 and all(p.proj > 0 for p in top),
+              f"{len(pool)} players{' (league scoring)' if client_for_pool is real else ' (ESPN public defaults; cookies not used)'}; "
+              f"top: {', '.join(p.name for p in top)}")
+    except EspnError as e:
+        check("Player pool with projections", False, str(e)[:200])
+        pool = []
+    if pool:
+        s = slot or 1
+        rosters, _log = sim.simulate(pool, cfg, {s}, seed=1)
+        r = rosters[s]
+        legal = len(r) == cfg.rounds and sum(r.open_starters().values()) == 0 and r.count("K") == 1 and r.count("DST") == 1
+        table = sorted(rosters, key=lambda k: -rosters[k].starters_points())
+        check("Simulated draft builds a legal roster", legal,
+              f"slot {s}: {len(r)} players, finished #{table.index(s) + 1} of {cfg.teams} by projected starters")
+        try:
+            mine, _ = run_mock(client_for_pool, cfg_json, args, slot=s, seed=2, fast=True, auto=True, quiet=True)
+            legal = len(mine) == cfg.rounds and sum(mine.open_starters().values()) == 0
+            check("Live-draft machinery (fast offline mock)", legal, f"{len(mine)} picks tracked for your team")
+        except Exception as e:  # noqa: BLE001
+            check("Live-draft machinery (fast offline mock)", False, f"{type(e).__name__}: {e}")
+    failed = [n for n, ok, _ in results if not ok]
+    print()
+    if failed:
+        print(f"RESULT: {len(failed)} check(s) need attention: {', '.join(failed)}")
+        return 1
+    print("RESULT: all checks passed. At draft time run start_live.command / start_live.bat (or: python3 draft.py live).")
+    return 0
+
+
 # ----------------------------------------------------------------------- main
 def main(argv=None) -> int:
     try:  # live output must show up immediately even when piped (e.g. run from Claude Code)
@@ -583,6 +837,8 @@ def main(argv=None) -> int:
     l.add_argument("--auto", action="store_true", help="EXPERIMENTAL: click the pick in the ESPN draft room")
     l.add_argument("--dry-run", action="store_true", help="with --auto: search and highlight, but do not click Draft")
     l.add_argument("--cdp-url", default="http://127.0.0.1:9222", help="Chrome remote-debugging URL for --auto")
+    l.add_argument("--confirm-seconds", type=int, default=12, help="with --auto: how long to wait for ESPN to register a submitted pick")
+    l.add_argument("--pick-deadline", type=int, default=45, help="with --auto: stop retrying this many seconds after your turn starts")
     l.set_defaults(fn=cmd_live)
 
     s = sub.add_parser("simulate", parents=[common], help="mock draft against ADP bots (--slot may repeat)")
@@ -590,6 +846,18 @@ def main(argv=None) -> int:
     s.add_argument("--all", action="store_true", help="run every slot separately and summarize")
     s.add_argument("--verbose", action="store_true")
     s.set_defaults(fn=cmd_simulate)
+
+    k = sub.add_parser("mock", parents=[common], help="offline practice draft that looks like draft day")
+    k.add_argument("--pace", type=float, default=3.0, help="seconds per other-team pick (default 3)")
+    k.add_argument("--auto", action="store_true", help="make your picks automatically (engine #1)")
+    k.add_argument("--fast", action="store_true", help="no delays, automatic picks (smoke test)")
+    k.add_argument("--seed", type=int, default=1)
+    k.add_argument("--top", type=int, default=8)
+    k.add_argument("--no-beep", action="store_true")
+    k.set_defaults(fn=cmd_mock)
+
+    t = sub.add_parser("selftest", parents=[common], help="check Python, tests, ESPN access, cookies, team, and a fast mock")
+    t.set_defaults(fn=cmd_selftest)
 
     m = sub.add_parser("mark", parents=[common], help="manual fallback: record a pick made in the draft room")
     m.add_argument("names", nargs="+")

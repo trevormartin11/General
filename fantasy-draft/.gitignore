@@ -9,3 +9,4 @@ board.csv
 queue.txt
 *.log
 __pycache__/
+dist/
