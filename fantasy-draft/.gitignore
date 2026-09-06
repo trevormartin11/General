@@ -1,0 +1,12 @@
+# personal / machine-specific (never commit cookies)
+config.json
+cache/
+screenshots/
+drafted.txt
+targets.txt
+avoid.txt
+board.csv
+queue.txt
+*.log
+__pycache__/
+dist/
