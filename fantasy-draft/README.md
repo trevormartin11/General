@@ -37,7 +37,7 @@ there is nothing to coordinate.
 
 | Mode | Command | Risk |
 |------|---------|------|
-| **Co-pilot (recommended)** | `python3 draft.py live` | none: it prints, you click in the ESPN draft room |
+| **Co-pilot (recommended)** | `python3 draft.py live` (or double-click `start_live.command` / `start_live.bat`) | none: it prints, you click in the ESPN draft room |
 | Auto-click (experimental) | `python3 draft.py live --auto` | brittle: drives your Chrome via Playwright; test in a mock draft first |
 
 The co-pilot prints every pick as it happens, beeps when you are on the clock,

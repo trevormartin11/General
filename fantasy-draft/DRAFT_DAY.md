@@ -51,7 +51,9 @@ Add a few names to `targets.txt` / `avoid.txt` if you have strong opinions
 ## 5. Draft time
 
 1. Open the ESPN draft room in your browser and log in.
-2. In a terminal in this folder:
+2. Start the co-pilot in its own window: double-click `start_live.command`
+   (Mac; if macOS blocks it, right-click -> Open) or `start_live.bat`
+   (Windows). Or, in a terminal in this folder:
 
    ```
    python3 draft.py live

@@ -25,10 +25,17 @@ draft with the co-pilot in this folder. Read README.md and DRAFT_DAY.md first.
    `--team-id` / `--slot`, or set it in `config.json`.
 2. Optionally `python3 draft.py board` and `python3 draft.py simulate` so they
    can see the strategy.
-3. When the draft room opens: run `python3 draft.py live` in a terminal they
-   can see and leave it running. Tell them the routine: when the panel says
-   ON THE CLOCK, click the #1 recommendation in ESPN; keep the top 2-3 in the
-   ESPN queue as timeout insurance.
+3. When the draft room opens, start the co-pilot **in its own terminal
+   window**, not through your Bash tool (it runs for 2-3 hours and would hit
+   the tool timeout):
+   * macOS: `open -a Terminal ./start_live.command`
+   * Windows: `start "" start_live.bat`
+   * Linux: `x-terminal-emulator -e ./start_live.command` (or tell them to
+     run `python3 draft.py live` in a terminal themselves)
+   Confirm the new window shows the league name and "Waiting for the draft"
+   or the current pick. Tell them the routine: when the panel says ON THE
+   CLOCK, click the #1 recommendation in ESPN; keep the top 2-3 in the ESPN
+   queue as timeout insurance.
 4. Stay available. If they ask "who should I take" or "QB now or later?",
    run `python3 draft.py recommend` for the fresh panel and explain the Gain
    / Now+ / Avail@nxt columns in one sentence each. They make the final call.
